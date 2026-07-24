@@ -1,0 +1,8 @@
+export { default as StudentDashboard } from './StudentDashboard'
+export { default as StudentClasses } from './StudentClasses'
+export { default as StudentClassDetail } from './StudentClassDetail'
+export { default as StudentAssignments } from './StudentAssignments'
+export { default as StudentRecordings } from './StudentRecordings'
+export { default as StudentAttendance } from './StudentAttendance'
+export { default as StudentProfile } from './StudentProfile'
+export { default as StudentSettings } from './StudentSettings'

@@ -1,0 +1,81 @@
+{
+  "rules": {
+    "users": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$uid": {
+        ".read": "auth.uid === $uid || root.child('users/' + auth.uid + '/role').val() === 'teacher'",
+        ".write": "auth.uid === $uid",
+        ".validate": "newData.hasChildren(['uid', 'email', 'displayName', 'role'])",
+        "role": {
+          ".validate": "newData.val() === 'teacher' || newData.val() === 'student'"
+        }
+      }
+    },
+    "classes": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$classId": {
+        ".read": "auth != null",
+        ".write": "root.child('users/' + auth.uid + '/role').val() === 'teacher'",
+        "students": {
+          "$studentId": {
+            ".write": "auth.uid === $studentId || root.child('users/' + auth.uid + '/role').val() === 'teacher'"
+          }
+        }
+      }
+    },
+    "meetings": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$meetingId": {
+        "participants": {
+          ".write": "auth != null"
+        },
+        "whiteboard": {
+          ".write": "auth != null"
+        }
+      }
+    },
+    "messages": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$meetingId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "attendance": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "assignments": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$assignmentId": {
+        "submissions": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "announcements": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "notifications": {
+      "$uid": {
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid"
+      }
+    },
+    "presence": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth.uid === 'admin'"
+    }
+  }
+}
