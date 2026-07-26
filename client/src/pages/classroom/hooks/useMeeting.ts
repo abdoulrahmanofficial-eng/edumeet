@@ -363,11 +363,19 @@ export function useMeeting({
 
   useEffect(() => {
     if (!isReconnecting || isConnected || !token) return
-    const interval = setInterval(() => {
-      if (roomRef.current?.state === ConnectionState.Disconnected) {
-        connect().catch(() => {})
+    const interval = setInterval(async () => {
+      try {
+        if (!roomRef.current) return
+        if (roomRef.current.state !== ConnectionState.Disconnected) {
+          roomRef.current.disconnect()
+        }
+        console.log('[useMeeting] Attempting reconnect...')
+        await connect()
+        console.log('[useMeeting] Reconnect succeeded')
+      } catch (err) {
+        console.error('[useMeeting] Reconnect failed:', err)
       }
-    }, 2000)
+    }, 3000)
     return () => clearInterval(interval)
   }, [isReconnecting, isConnected, token, connect])
 
