@@ -69,6 +69,7 @@ function ClassroomPageContent() {
   } = useMeeting({
     token: token ?? '',
     serverUrl: import.meta.env.VITE_LIVEKIT_URL || undefined,
+    role: user?.role ?? 'student',
     onLeave: () => {
       useMeetingStore.getState().reset()
       navigate(`/${user?.role || 'student'}/dashboard`, { replace: true })

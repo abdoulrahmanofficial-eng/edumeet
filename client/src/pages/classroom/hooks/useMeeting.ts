@@ -20,6 +20,7 @@ import { meetingsService } from '@/services/meetings'
 interface UseMeetingOptions {
   token: string
   serverUrl?: string
+  role?: 'teacher' | 'student'
   onLeave?: () => void
 }
 
@@ -47,9 +48,12 @@ interface UseMeetingReturn {
   localTrackVersion: number
 }
 
+const VIDEO_QUALITY = { LOW: 0, MEDIUM: 1, HIGH: 2 } as const
+
 export function useMeeting({
   token,
   serverUrl,
+  role,
   onLeave,
 }: UseMeetingOptions): UseMeetingReturn {
   const { t } = useTranslation()
@@ -75,9 +79,11 @@ export function useMeeting({
   const onLeaveRef = useRef(onLeave)
   const tRef = useRef(t)
   const reconnectAttemptsRef = useRef(0)
+  const applyVideoQualityRef = useRef(applyVideoQuality)
   isConnectedRef.current = isConnected
   onLeaveRef.current = onLeave
   tRef.current = t
+  applyVideoQualityRef.current = applyVideoQuality
 
   const updateParticipants = useCallback((r: Room) => {
     const list: RemoteParticipant[] = []
@@ -85,6 +91,21 @@ export function useMeeting({
     list.sort((a, b) => Number(a.joinedAt ?? 0) - Number(b.joinedAt ?? 0))
     setParticipants(list)
   }, [])
+
+  const applyVideoQuality = useCallback(
+    (publication: TrackPublication, participant: RemoteParticipant) => {
+      if (!role || publication.kind !== 'video' || publication.source === 'screen_share') return
+      const track = publication.videoTrack
+      if (!track || typeof (track as any).setVideoQuality !== 'function') return
+      const publisherRole = participant.attributes?.role || 'student'
+      if (role === 'student' && publisherRole === 'teacher') {
+        ;(track as any).setVideoQuality(VIDEO_QUALITY.HIGH)
+      } else if (role === 'teacher' && publisherRole !== 'teacher') {
+        ;(track as any).setVideoQuality(VIDEO_QUALITY.LOW)
+      }
+    },
+    [role],
+  )
 
   const checkScreenShare = useCallback((participant: RemoteParticipant | LocalParticipant) => {
     const pub = participant.getTrackPublication(Track.Source.ScreenShare)
@@ -98,6 +119,7 @@ export function useMeeting({
     (participant: RemoteParticipant) => {
       if (roomRef.current) updateParticipants(roomRef.current)
       checkScreenShare(participant)
+      participant.trackPublications.forEach((pub) => applyVideoQualityRef.current(pub, participant))
     },
     [updateParticipants, checkScreenShare],
   )
@@ -121,7 +143,10 @@ export function useMeeting({
           setLocalParticipant(roomRef.current.localParticipant)
           setIsMuted(!roomRef.current.localParticipant.isMicrophoneEnabled)
           setIsCameraOff(!roomRef.current.localParticipant.isCameraEnabled)
-          roomRef.current.remoteParticipants.forEach((p) => checkScreenShare(p))
+          roomRef.current.remoteParticipants.forEach((p) => {
+            checkScreenShare(p)
+            p.trackPublications.forEach((pub) => applyVideoQualityRef.current(pub, p))
+          })
           setTimeout(() => {
             if (roomRef.current) {
               roomRef.current.remoteParticipants.forEach((p) => checkScreenShare(p))
@@ -223,6 +248,7 @@ export function useMeeting({
         setSharingParticipant(participant as RemoteParticipant)
         setIsSharing(true)
       }
+      applyVideoQualityRef.current(publication, participant as RemoteParticipant)
     })
     r.on(RoomEvent.LocalTrackPublished, () => {
       setLocalTrackVersion(v => v + 1)
