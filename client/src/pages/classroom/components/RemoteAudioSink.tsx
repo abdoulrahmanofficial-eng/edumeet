@@ -4,7 +4,6 @@ import type { RemoteParticipant } from 'livekit-client'
 
 interface RemoteAudioSinkProps {
   participants: RemoteParticipant[]
-  isTeacher: (identity?: string, role?: string) => boolean
 }
 
 export function RemoteAudioSink({ participants }: RemoteAudioSinkProps) {

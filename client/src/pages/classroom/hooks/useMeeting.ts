@@ -6,11 +6,12 @@ import {
   Participant,
   RoomEvent,
   ConnectionState,
+  Track,
   createLocalAudioTrack,
   createLocalVideoTrack,
   type TrackPublication,
   type LocalTrack,
-  type VideoPreset,
+  VideoPreset,
 } from 'livekit-client'
 import { useTranslation } from 'react-i18next'
 import toast from 'react-hot-toast'
@@ -26,6 +27,7 @@ interface UseMeetingReturn {
   room: Room | null
   isConnected: boolean
   connectionState: ConnectionState
+  isReconnecting: boolean
   participants: RemoteParticipant[]
   localParticipant: LocalParticipant | null
   isMuted: boolean
@@ -65,12 +67,14 @@ export function useMeeting({
   const [sharingParticipant, setSharingParticipant] = useState<RemoteParticipant | null>(null)
   const [activeSpeaker, setActiveSpeaker] = useState<RemoteParticipant | null>(null)
   const [localTrackVersion, setLocalTrackVersion] = useState(0)
+  const [isReconnecting, setIsReconnecting] = useState(false)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mediaStartedRef = useRef(false)
   const intentionalDisconnectRef = useRef(false)
   const isConnectedRef = useRef(isConnected)
   const onLeaveRef = useRef(onLeave)
   const tRef = useRef(t)
+  const reconnectAttemptsRef = useRef(0)
   isConnectedRef.current = isConnected
   onLeaveRef.current = onLeave
   tRef.current = t
@@ -82,11 +86,20 @@ export function useMeeting({
     setParticipants(list)
   }, [])
 
+  const checkScreenShare = useCallback((participant: RemoteParticipant | LocalParticipant) => {
+    const pub = participant.getTrackPublication(Track.Source.ScreenShare)
+    if (pub?.videoTrack) {
+      setSharingParticipant(participant as RemoteParticipant)
+      setIsSharing(true)
+    }
+  }, [])
+
   const handleParticipantConnected = useCallback(
     (participant: RemoteParticipant) => {
       if (roomRef.current) updateParticipants(roomRef.current)
+      checkScreenShare(participant)
     },
-    [updateParticipants],
+    [updateParticipants, checkScreenShare],
   )
 
   const handleParticipantDisconnected = useCallback(
@@ -101,17 +114,28 @@ export function useMeeting({
       setConnectionState(state)
       if (state === ConnectionState.Connected) {
         setIsConnected(true)
+        setIsReconnecting(false)
+        reconnectAttemptsRef.current = 0
         if (roomRef.current) {
           updateParticipants(roomRef.current)
           setLocalParticipant(roomRef.current.localParticipant)
           setIsMuted(!roomRef.current.localParticipant.isMicrophoneEnabled)
           setIsCameraOff(!roomRef.current.localParticipant.isCameraEnabled)
+          roomRef.current.remoteParticipants.forEach((p) => checkScreenShare(p))
+          setTimeout(() => {
+            if (roomRef.current) {
+              roomRef.current.remoteParticipants.forEach((p) => checkScreenShare(p))
+            }
+          }, 2000)
         }
+      } else if (state === ConnectionState.Reconnecting) {
+        setIsReconnecting(true)
       } else if (
         state === ConnectionState.Disconnected &&
         isConnectedRef.current
       ) {
         setIsConnected(false)
+        setIsReconnecting(false)
         setLocalParticipant(null)
         setParticipants([])
         setActiveSpeaker(null)
@@ -120,12 +144,11 @@ export function useMeeting({
         if (intentionalDisconnectRef.current) {
           intentionalDisconnectRef.current = false
         } else if (mediaStartedRef.current) {
-          toast(tRef.current('classroom.connectionLost'), { icon: '⚠️' })
-          onLeaveRef.current?.()
+          setIsReconnecting(true)
         }
       }
     },
-    [updateParticipants],
+    [updateParticipants, checkScreenShare],
   )
 
   const handleTrackPublished = useCallback(
@@ -171,12 +194,12 @@ export function useMeeting({
         resolution: { width: 1920, height: 1080 },
       },
       publishDefaults: {
-        videoEncoding: { maxBitrate: 3500000, maxFramerate: 30 },
+        videoEncoding: { maxBitrate: 8000000, maxFramerate: 60 },
         videoSimulcastLayers: [
-          { width: 1280, height: 720, encoding: { maxBitrate: 1700000, maxFramerate: 30 }, resolution: { width: 1280, height: 720 } },
-          { width: 640, height: 360, encoding: { maxBitrate: 600000, maxFramerate: 30 }, resolution: { width: 640, height: 360 } },
-        ] as VideoPreset[],
-        audioPreset: { maxBitrate: 64000 },
+          new VideoPreset(1280, 720, 3000000, 60),
+          new VideoPreset(640, 360, 1200000, 30),
+        ],
+        audioPreset: { maxBitrate: 256000 },
       },
     })
 
@@ -191,6 +214,15 @@ export function useMeeting({
     })
     r.on(RoomEvent.TrackUnmuted, () => {
       if (r.localParticipant) setIsMuted(!r.localParticipant.isMicrophoneEnabled)
+    })
+    r.on(RoomEvent.TrackSubscribed, (_track, publication, participant) => {
+      if (
+        publication.kind === 'video' &&
+        publication.source === 'screen_share'
+      ) {
+        setSharingParticipant(participant as RemoteParticipant)
+        setIsSharing(true)
+      }
     })
     r.on(RoomEvent.LocalTrackPublished, () => {
       setLocalTrackVersion(v => v + 1)
@@ -329,10 +361,21 @@ export function useMeeting({
     [t],
   )
 
+  useEffect(() => {
+    if (!isReconnecting || isConnected || !token) return
+    const interval = setInterval(() => {
+      if (roomRef.current?.state === ConnectionState.Disconnected) {
+        connect().catch(() => {})
+      }
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [isReconnecting, isConnected, token, connect])
+
   return {
     room,
     isConnected,
     connectionState,
+    isReconnecting,
     participants,
     localParticipant,
     isMuted,

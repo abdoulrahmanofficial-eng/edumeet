@@ -8,11 +8,9 @@ import {
   HiComputerDesktop,
   HiChatBubbleLeftRight,
   HiUserGroup,
-  HiHandRaised,
   HiEllipsisHorizontal,
   HiPaintBrush,
   HiCircleStack,
-  HiCog6Tooth,
   HiPhone,
   HiClock,
   HiArrowTopRightOnSquare,
@@ -27,7 +25,6 @@ interface ControlBarProps {
   isMuted: boolean
   isCameraOff: boolean
   isSharing: boolean
-  isHandRaised: boolean
   userRole: 'teacher' | 'student'
   chatUnread: number
   meetingDuration: string
@@ -36,7 +33,6 @@ interface ControlBarProps {
   onToggleScreenShare: () => void
   onToggleChat: () => void
   onToggleParticipants: () => void
-  onToggleHandRaise: () => void
   onOpenWhiteboard: () => void
   onEndRoom?: () => void
   onLeave: () => void
@@ -47,7 +43,6 @@ export function ControlBar({
   isMuted,
   isCameraOff,
   isSharing,
-  isHandRaised,
   userRole,
   chatUnread,
   meetingDuration,
@@ -56,7 +51,6 @@ export function ControlBar({
   onToggleScreenShare,
   onToggleChat,
   onToggleParticipants,
-  onToggleHandRaise,
   onOpenWhiteboard,
   onEndRoom,
   onLeave,
@@ -143,121 +137,98 @@ export function ControlBar({
             shortcut="V"
             onClick={onToggleCamera}
           />
-          <ControlButton
-            icon={HiComputerDesktop}
-            label={isSharing ? t('classroom.stopSharing') : t('classroom.shareScreen')}
-            active={isSharing}
-            shortcut="S"
-            onClick={onToggleScreenShare}
-          />
+          {userRole === 'teacher' && (
+            <>
+              <ControlButton
+                icon={HiComputerDesktop}
+                label={isSharing ? t('classroom.stopSharing') : t('classroom.shareScreen')}
+                active={isSharing}
+                shortcut="S"
+                onClick={onToggleScreenShare}
+              />
 
-          <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
+              <ControlButton
+                icon={HiChatBubbleLeftRight}
+                label={t('classroom.chat')}
+                shortcut="C"
+                badge={chatUnread}
+                onClick={onToggleChat}
+              />
+              <ControlButton
+                icon={HiUserGroup}
+                label={t('classroom.participants')}
+                shortcut="P"
+                onClick={onToggleParticipants}
+              />
 
-          <ControlButton
-            icon={HiChatBubbleLeftRight}
-            label={t('classroom.chat')}
-            shortcut="C"
-            badge={chatUnread}
-            onClick={onToggleChat}
-          />
-          <ControlButton
-            icon={HiUserGroup}
-            label={t('classroom.participants')}
-            shortcut="P"
-            onClick={onToggleParticipants}
-          />
-          <ControlButton
-            icon={HiArrowTopRightOnSquare}
-            label={isRTL ? 'دعوة' : 'Invite'}
-            onClick={handleInvite}
-          />
-
-          {userRole === 'student' && (
-            <ControlButton
-              icon={HiHandRaised}
-              label={isHandRaised ? t('classroom.lowerHand') : t('classroom.raiseHand')}
-              active={isHandRaised}
-              onClick={onToggleHandRaise}
-            />
+              <div className="relative">
+                <ControlButton
+                  icon={HiEllipsisHorizontal}
+                  label={t('common.more')}
+                  onClick={() => setShowMore(!showMore)}
+                />
+                {showMore && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowMore(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={cn(
+                        'absolute bottom-full mb-2 z-50 min-w-[180px] bg-gray-800 border border-white/10 rounded-xl p-1.5 shadow-xl',
+                        isRTL ? 'left-0' : 'right-0',
+                      )}
+                    >
+                      <MoreOption
+                        icon={HiArrowTopRightOnSquare}
+                        label={isRTL ? 'دعوة الطلاب' : 'Invite Students'}
+                        onClick={handleInvite}
+                      />
+                      <MoreOption
+                        icon={HiPaintBrush}
+                        label={t('classroom.openWhiteboard')}
+                        onClick={() => { setShowMore(false); onOpenWhiteboard() }}
+                      />
+                      <MoreOption
+                        icon={HiCircleStack}
+                        label={t('classroom.record')}
+                        onClick={() => setShowMore(false)}
+                      />
+                    </motion.div>
+                  </>
+                )}
+              </div>
+            </>
           )}
 
-          <div className="w-px h-8 bg-white/10 mx-1 hidden sm:block" />
+          <div className="flex-1" />
 
-          <div className="relative">
-            <ControlButton
-              icon={HiEllipsisHorizontal}
-              label={t('common.more')}
-              onClick={() => setShowMore(!showMore)}
-            />
-            {showMore && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowMore(false)}
-                />
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={cn(
-                    'absolute bottom-full mb-2 z-50 min-w-[180px] bg-gray-800 border border-white/10 rounded-xl p-1.5 shadow-xl',
-                    isRTL ? 'left-0' : 'right-0',
-                  )}
-                >
-                  <MoreOption
-                    icon={HiArrowTopRightOnSquare}
-                    label={isRTL ? 'دعوة الطلاب' : 'Invite Students'}
-                    onClick={handleInvite}
-                  />
-                  {userRole === 'teacher' && (
-                    <MoreOption
-                      icon={HiPhone}
-                      label={t('classroom.endRoom')}
-                      onClick={() => {
-                        setShowMore(false)
-                        setShowEndConfirm(true)
-                      }}
-                    />
-                  )}
-                  <MoreOption
-                    icon={HiPaintBrush}
-                    label={t('classroom.openWhiteboard')}
-                    onClick={() => {
-                      setShowMore(false)
-                      onOpenWhiteboard()
-                    }}
-                  />
-                  <MoreOption
-                    icon={HiCircleStack}
-                    label={t('classroom.record')}
-                    onClick={() => setShowMore(false)}
-                  />
-                  <MoreOption
-                    icon={HiCog6Tooth}
-                    label={t('classroom.settings')}
-                    onClick={() => setShowMore(false)}
-                  />
-                </motion.div>
-              </>
-            )}
+          <div className="hidden sm:flex items-center gap-2 text-gray-400 text-sm">
+            <HiClock className="w-4 h-4" />
+            <span className="tabular-nums font-mono">{meetingDuration}</span>
           </div>
+
+          {userRole === 'teacher' ? (
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<HiPhone className="w-4 h-4 rotate-135" />}
+              onClick={() => setShowEndConfirm(true)}
+              className="!bg-danger-500 hover:!bg-danger-600 !rounded-xl ml-2"
+            >
+              <span className="hidden sm:inline">{t('classroom.endRoom')}</span>
+            </Button>
+          ) : (
+            <Button
+              variant="danger"
+              size="sm"
+              icon={<HiPhone className="w-4 h-4 rotate-135" />}
+              onClick={() => setShowLeaveConfirm(true)}
+              className="!bg-danger-500 hover:!bg-danger-600 !rounded-xl ml-2"
+            >
+              <span className="hidden sm:inline">{t('classroom.leave')}</span>
+            </Button>
+          )}
         </div>
-
-        <div className="flex-1" />
-
-        <div className="hidden sm:flex items-center gap-2 text-gray-400 text-sm">
-          <HiClock className="w-4 h-4" />
-          <span className="tabular-nums font-mono">{meetingDuration}</span>
-        </div>
-
-        <Button
-          variant="danger"
-          size="sm"
-          icon={<HiPhone className="w-4 h-4 rotate-135" />}
-          onClick={() => setShowLeaveConfirm(true)}
-          className="!bg-danger-500 hover:!bg-danger-600 !rounded-xl ml-2"
-        >
-          <span className="hidden sm:inline">{t('classroom.leave')}</span>
-        </Button>
       </motion.div>
 
       <Modal

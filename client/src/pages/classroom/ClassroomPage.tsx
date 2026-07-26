@@ -22,7 +22,7 @@ import { ChatPanel } from './components/ChatPanel'
 import { ParticipantsPanel } from './components/ParticipantsPanel'
 import { WaitingRoom } from './components/WaitingRoom'
 import { ReactionOverlay } from './components/ReactionOverlay'
-import type { RemoteParticipant, LocalParticipant, RemoteTrackPublication } from 'livekit-client'
+import type { RemoteParticipant, LocalParticipant } from 'livekit-client'
 import { ConnectionState, Track } from 'livekit-client'
 import type { ReactionType } from './hooks/useReactions'
 
@@ -48,6 +48,7 @@ function ClassroomPageContent() {
     room,
     isConnected,
     connectionState,
+    isReconnecting,
     participants,
     localParticipant,
     isMuted,
@@ -160,19 +161,17 @@ function ClassroomPageContent() {
   )
 
   useEffect(() => {
-    if (token && !isConnected && showPreJoin && connectionState !== ConnectionState.Connecting) {
+    if (token && !isConnected && connectionState !== ConnectionState.Connecting && (showPreJoin || isReconnecting)) {
       connect().catch(() => {})
     }
-  }, [token, isConnected, showPreJoin, connectionState, connect])
+  }, [token, isConnected, showPreJoin, isReconnecting, connectionState, connect])
 
   const handleLeave = useCallback(() => {
     timer.reset()
     disconnect()
   }, [timer, disconnect])
 
-  const handleToggleHandRaise = useCallback(() => {
-    setIsHandRaised((prev) => !prev)
-  }, [])
+
 
   const handleEndRoom = useCallback(async () => {
     if (!meetingId) return
@@ -206,12 +205,7 @@ function ClassroomPageContent() {
   const viewerIsTeacher =
     user?.role === 'teacher' || user?.uid === currentMeeting?.teacherId
 
-  const isTeacher = (identity?: string, role?: string) =>
-    identity === currentMeeting?.teacherId || role === 'teacher'
-
-  const visibleParticipants = viewerIsTeacher
-    ? participants
-    : participants.filter((p) => isTeacher(p.identity, p.attributes?.role as string))
+  const visibleParticipants = participants
 
   const participantEntries = [
     ...(localParticipant
@@ -240,27 +234,9 @@ function ClassroomPageContent() {
     })),
   ]
 
-  useEffect(() => {
-    if (viewerIsTeacher) return
-    participants.forEach((p) => {
-      if (!isTeacher(p.identity, p.attributes?.role as string)) {
-        p.getTrackPublications().forEach((pub) => {
-          // Keep audio so students can HEAR each other; only hide video
-          const isVideo =
-            pub.source === Track.Source.Camera || pub.source === Track.Source.ScreenShare
-          if (isVideo) {
-            try {
-              ;(pub as RemoteTrackPublication).setSubscribed(false)
-            } catch {}
-          }
-        })
-      }
-    })
-  }, [participants, viewerIsTeacher])
-
   const isLoading = meetingLoading || (tokenLoading && !tokenError)
 
-  if (isLoading && !isConnected) {
+  if ((isLoading || isReconnecting) && !isConnected) {
     return <LoadingScreen message={t('classroom.reconnecting')} />
   }
 
@@ -310,7 +286,6 @@ function ClassroomPageContent() {
             isMuted={isMuted}
             isCameraOff={isCameraOff}
             isSharing={isSharing}
-            isHandRaised={isHandRaised}
             userRole={user?.role || 'student'}
             chatUnread={0}
             meetingDuration={timer.formatted}
@@ -325,7 +300,6 @@ function ClassroomPageContent() {
               setShowParticipants((p) => !p)
               setShowChat(false)
             }}
-            onToggleHandRaise={handleToggleHandRaise}
             onOpenWhiteboard={handleOpenWhiteboard}
             onEndRoom={handleEndRoom}
             onLeave={handleLeave}
